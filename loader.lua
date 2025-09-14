@@ -17,7 +17,6 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Settings = {
     ESPEnabled = false,
     AimlockEnabled = false,
-    AimlockFOVEnabled = false, -- toggle instead of slider
     AimlockPrediction = 0.18,
     WallbangEnabled = false,
     MeleeAuraEnabled = false,
@@ -26,22 +25,6 @@ local Settings = {
     InfiniteSprint = false,
     PlayerFOV = Camera.FieldOfView or 70
 }
-
--- =========================
--- Drawing Check
--- =========================
-local DrawingAvailable = pcall(function() return Drawing.new("Circle") end)
-local AimlockCircle
-if DrawingAvailable then
-    AimlockCircle = Drawing.new("Circle")
-    AimlockCircle.Radius = 120
-    AimlockCircle.Color = Color3.fromRGB(255,0,0)
-    AimlockCircle.Thickness = 1
-    AimlockCircle.Visible = false
-    AimlockCircle.Filled = false
-else
-    warn("Drawing library not available. Aimlock FOV circle disabled.")
-end
 
 -- =========================
 -- Create UI
@@ -101,7 +84,7 @@ makeTabButton("Combat",combatPage).BackgroundColor3=Color3.fromRGB(40,40,46)
 makeTabButton("Misc",miscPage)
 makeTabButton("Extras",extrasPage)
 
--- UI Controls Helpers
+-- UI Helpers
 local function addToggle(parent,text,callback)
     local btn = make(parent,"TextButton",{Size=UDim2.new(1,-10,0,32), BackgroundColor3=Color3.fromRGB(32,32,36), Text=text.." [OFF]", TextColor3=Color3.fromRGB(220,220,220), Font=Enum.Font.SourceSans, TextSize=15})
     make(btn,"UICorner",{CornerRadius=UDim.new(0,6)})
@@ -135,7 +118,6 @@ end
 
 -- Populate UI
 addToggle(combatPage,"Aimlock",function(v) Settings.AimlockEnabled=v end)
-addToggle(combatPage,"Aimlock FOV Circle",function(v) Settings.AimlockFOVEnabled=v end)
 addSlider(combatPage,"Prediction",0,100,Settings.AimlockPrediction*100,function(v) Settings.AimlockPrediction=v/100 end)
 addToggle(combatPage,"Wallbang",function(v) Settings.WallbangEnabled=v end)
 addToggle(combatPage,"Melee Aura",function(v) Settings.MeleeAuraEnabled=v end)
@@ -210,91 +192,133 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- ESP
+-- =========================
+-- ESP (Boxes + Names + Distances)
+-- =========================
 local ESPBoxes = {}
+local ESPNames = {}
+local ESPDistances = {}
+
 local function createESP(player)
-    if player==LocalPlayer then return end
-    local box=Drawing.new("Square")
-    box.Color=Color3.fromRGB(0,255,0)
-    box.Thickness=2
-    box.Filled=false
-    box.Transparency=1
-    ESPBoxes[player]=box
+    if player == LocalPlayer then return end
+    
+    local box = Drawing.new("Square")
+    box.Color = Color3.fromRGB(0, 255, 0)
+    box.Thickness = 2
+    box.Filled = false
+    box.Transparency = 1
+    ESPBoxes[player] = box
+
+    local nameTag = Drawing.new("Text")
+    nameTag.Color = Color3.fromRGB(255, 255, 255)
+    nameTag.Center = true
+    nameTag.Outline = true
+    nameTag.Size = 14
+    ESPNames[player] = nameTag
+
+    local distanceTag = Drawing.new("Text")
+    distanceTag.Color = Color3.fromRGB(255, 255, 0)
+    distanceTag.Center = true
+    distanceTag.Outline = true
+    distanceTag.Size = 14
+    ESPDistances[player] = distanceTag
 end
+
 local function removeESP(player)
-    if ESPBoxes[player] then ESPBoxes[player]:Remove() ESPBoxes[player]=nil end
+    if ESPBoxes[player] then ESPBoxes[player]:Remove() ESPBoxes[player] = nil end
+    if ESPNames[player] then ESPNames[player]:Remove() ESPNames[player] = nil end
+    if ESPDistances[player] then ESPDistances[player]:Remove() ESPDistances[player] = nil end
 end
+
 Players.PlayerAdded:Connect(createESP)
 Players.PlayerRemoving:Connect(removeESP)
-for _,p in pairs(Players:GetPlayers()) do createESP(p) end
+for _, p in pairs(Players:GetPlayers()) do createESP(p) end
 
 RunService.RenderStepped:Connect(function()
-    for player,box in pairs(ESPBoxes) do
+    for player, box in pairs(ESPBoxes) do
         if Settings.ESPEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-            local pos,vis=Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
-            if vis then
-                box.Visible=true
-                box.Size=Vector2.new(30,60)
-                box.Position=Vector2.new(pos.X-15,pos.Y-30)
+            local root = player.Character.HumanoidRootPart
+            local topPos = root.Position + Vector3.new(0, 3, 0)
+            local bottomPos = root.Position - Vector3.new(0, 3, 0)
+
+            local topScreen, topVis = Camera:WorldToViewportPoint(topPos)
+            local bottomScreen, bottomVis = Camera:WorldToViewportPoint(bottomPos)
+
+            if topVis or bottomVis then
+                local height = (topScreen.Y - bottomScreen.Y)
+                local width = height / 2
+                box.Size = Vector2.new(width, height)
+                box.Position = Vector2.new(topScreen.X - width / 2, topScreen.Y)
+                box.Visible = true
+
+                local nameTag = ESPNames[player]
+                nameTag.Text = player.Name
+                nameTag.Position = Vector2.new(topScreen.X, topScreen.Y - 10)
+                nameTag.Visible = true
+
+                local distanceTag = ESPDistances[player]
+                local dist = (root.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude
+                distanceTag.Text = string.format("%.0f studs", dist)
+                distanceTag.Position = Vector2.new(topScreen.X, topScreen.Y - 25)
+                distanceTag.Visible = true
             else
-                box.Visible=false
+                box.Visible = false
+                ESPNames[player].Visible = false
+                ESPDistances[player].Visible = false
             end
         else
-            box.Visible=false
+            box.Visible = false
+            if ESPNames[player] then ESPNames[player].Visible = false end
+            if ESPDistances[player] then ESPDistances[player].Visible = false end
         end
     end
 end)
 
 -- =========================
--- Aimlock (Right-Click)
+-- Aimlock (Right Mouse Button)
 -- =========================
-local RightMouseDown = false
-UIS.InputBegan:Connect(function(input, gp)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        RightMouseDown = true
-    end
-end)
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then
-        RightMouseDown = false
-    end
-end)
-
-local function getClosestPlayer()
-    local closestPlayer, shortestDistance = nil, math.huge
+local function getClosestTarget()
+    local closest
+    local shortest = math.huge
     for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-            local headPos = player.Character.Head.Position
-            local screenPos, onScreen = Camera:WorldToViewportPoint(headPos)
-            if onScreen then
-                local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
-                if distance < shortestDistance then
-                    closestPlayer, shortestDistance = player, distance
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local root = player.Character.HumanoidRootPart
+            local screenPos, vis = Camera:WorldToViewportPoint(root.Position)
+            if vis then
+                local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                local dist = (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude
+                if dist < shortest then
+                    shortest = dist
+                    closest = root
                 end
             end
         end
     end
-    return closestPlayer
+    return closest
 end
 
+local aiming = false
+UIS.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        aiming = true
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        aiming = false
+    end
+end)
+
 RunService.RenderStepped:Connect(function()
-    if Settings.AimlockEnabled and RightMouseDown then
-        local target = getClosestPlayer()
-        if target and target.Character and target.Character:FindFirstChild("Head") then
-            local targetPos = target.Character.Head.Position + (target.Character.Head.Velocity * Settings.AimlockPrediction)
-            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetPos)
+    if Settings.AimlockEnabled and aiming then
+        local target = getClosestTarget()
+        if target and RootPart then
+            local predictedPos = target.Position + (target.Velocity * Settings.AimlockPrediction)
+            local camCFrame = CFrame.new(Camera.CFrame.Position, predictedPos)
+            Camera.CFrame = camCFrame
         end
-    end
-
-    if DrawingAvailable and AimlockCircle then
-        AimlockCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-        AimlockCircle.Visible = Settings.AimlockFOVEnabled
-    end
-
-    if Camera then
-        Camera.FieldOfView = Settings.PlayerFOV
     end
 end)
 
 -- =========================
-print("✅ UniScript BETA: UI + Features Loaded Safely")
+print("✅ UniScript BETA: Full Features Loaded Safely")
