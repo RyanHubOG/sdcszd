@@ -17,7 +17,7 @@ local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local Settings = {
     ESPEnabled = false,
     AimlockEnabled = false,
-    AimlockFOV = 150,
+    AimlockFOVEnabled = false, -- toggle instead of slider
     AimlockPrediction = 0.18,
     WallbangEnabled = false,
     MeleeAuraEnabled = false,
@@ -34,7 +34,7 @@ local DrawingAvailable = pcall(function() return Drawing.new("Circle") end)
 local AimlockCircle
 if DrawingAvailable then
     AimlockCircle = Drawing.new("Circle")
-    AimlockCircle.Radius = Settings.AimlockFOV
+    AimlockCircle.Radius = 120
     AimlockCircle.Color = Color3.fromRGB(255,0,0)
     AimlockCircle.Thickness = 1
     AimlockCircle.Visible = false
@@ -133,9 +133,9 @@ local function addSlider(parent,text,min,max,default,callback)
     UIS.InputEnded:Connect(function(i) if dragging and i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end end)
 end
 
--- Populate UI (toggles & sliders)
+-- Populate UI
 addToggle(combatPage,"Aimlock",function(v) Settings.AimlockEnabled=v end)
-addSlider(combatPage,"Aimlock FOV",50,500,Settings.AimlockFOV,function(v) Settings.AimlockFOV=v end)
+addToggle(combatPage,"Aimlock FOV Circle",function(v) Settings.AimlockFOVEnabled=v end)
 addSlider(combatPage,"Prediction",0,100,Settings.AimlockPrediction*100,function(v) Settings.AimlockPrediction=v/100 end)
 addToggle(combatPage,"Wallbang",function(v) Settings.WallbangEnabled=v end)
 addToggle(combatPage,"Melee Aura",function(v) Settings.MeleeAuraEnabled=v end)
@@ -146,7 +146,7 @@ addToggle(miscPage,"Infinite Sprint",function(v) Settings.InfiniteSprint=v end)
 addSlider(miscPage,"Player FOV",70,120,Settings.PlayerFOV,function(v) Settings.PlayerFOV=v Camera.FieldOfView=v end)
 addToggle(miscPage,"ESP",function(v) Settings.ESPEnabled=v end)
 
--- Extras buttons
+-- Extras
 local copyBtn = make(extrasPage,"TextButton",{Size=UDim2.new(0,240,0,34), BackgroundColor3=Color3.fromRGB(60,60,70), Text="Copy Discord", TextColor3=Color3.fromRGB(230,230,230)})
 make(copyBtn,"UICorner",{CornerRadius=UDim.new(0,6)})
 copyBtn.MouseButton1Click:Connect(function() pcall(function() setclipboard("https://discord.gg/dJEM47ZtGa") end) end)
@@ -201,16 +201,6 @@ task.spawn(function()
     end
 end)
 
--- Player FOV updater
-RunService.RenderStepped:Connect(function()
-    if Camera then Camera.FieldOfView=Settings.PlayerFOV end
-    if DrawingAvailable and AimlockCircle then
-        AimlockCircle.Position=Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2)
-        AimlockCircle.Radius=Settings.AimlockFOV
-        AimlockCircle.Visible=Settings.AimlockEnabled
-    end
-end)
-
 -- NoClip
 RunService.Stepped:Connect(function()
     if Settings.NoClipEnabled and Character then
@@ -255,7 +245,56 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
--- Aimlock and Melee Aura logic can be wired here as before
--- Wallbang hook placeholder (depends on shooting method)
+-- =========================
+-- Aimlock (Right-Click)
+-- =========================
+local RightMouseDown = false
+UIS.InputBegan:Connect(function(input, gp)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        RightMouseDown = true
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        RightMouseDown = false
+    end
+end)
+
+local function getClosestPlayer()
+    local closestPlayer, shortestDistance = nil, math.huge
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
+            local headPos = player.Character.Head.Position
+            local screenPos, onScreen = Camera:WorldToViewportPoint(headPos)
+            if onScreen then
+                local distance = (Vector2.new(screenPos.X, screenPos.Y) - Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)).Magnitude
+                if distance < shortestDistance then
+                    closestPlayer, shortestDistance = player, distance
+                end
+            end
+        end
+    end
+    return closestPlayer
+end
+
+RunService.RenderStepped:Connect(function()
+    if Settings.AimlockEnabled and RightMouseDown then
+        local target = getClosestPlayer()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            local targetPos = target.Character.Head.Position + (target.Character.Head.Velocity * Settings.AimlockPrediction)
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, targetPos)
+        end
+    end
+
+    if DrawingAvailable and AimlockCircle then
+        AimlockCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+        AimlockCircle.Visible = Settings.AimlockFOVEnabled
+    end
+
+    if Camera then
+        Camera.FieldOfView = Settings.PlayerFOV
+    end
+end)
+
 -- =========================
 print("✅ UniScript BETA: UI + Features Loaded Safely")
