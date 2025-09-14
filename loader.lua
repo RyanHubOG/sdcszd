@@ -1,5 +1,5 @@
 -- =========================
--- UniScript BETA — Safe Load Version d
+-- UniScript BETA — Safe Load Version ads
 -- =========================
 
 local Players = game:GetService("Players")
@@ -27,6 +27,9 @@ local Settings = {
     PlayerFOV = Camera.FieldOfView or 70
 }
 
+local showFOV = false -- Show Aimlock FOV toggle
+local aiming = false
+
 -- =========================
 -- Drawing Check
 -- =========================
@@ -39,10 +42,12 @@ if DrawingAvailable then
     AimlockCircle.Thickness = 1
     AimlockCircle.Visible = false
     AimlockCircle.Filled = false
+else
+    warn("Drawing library not available. Aimlock FOV circle disabled.")
 end
 
 -- =========================
--- UI Creation
+-- Create UI
 -- =========================
 local function make(parent, class, props)
     local obj = Instance.new(class)
@@ -52,17 +57,22 @@ local function make(parent, class, props)
 end
 
 local screenGui = make(PlayerGui, "ScreenGui", {Name="UniScriptGUI", ResetOnSpawn=false})
+
+-- Main Window
 local window = make(screenGui,"Frame",{Size=UDim2.new(0,580,0,380), Position=UDim2.new(0.06,0,0.12,0), BackgroundColor3=Color3.fromRGB(18,18,20), BorderSizePixel=0})
 make(window,"UICorner",{CornerRadius=UDim.new(0,8)})
 
+-- Title Bar
 local titleBar = make(window,"Frame",{Size=UDim2.new(1,0,0,44), BackgroundColor3=Color3.fromRGB(12,12,14), BorderSizePixel=0})
-make(titleBar,"TextLabel",{Size=UDim2.new(1,-120,1,0), Position=UDim2.new(0,20,0,0), BackgroundTransparency=1, Text="Criminality Enhancer — UniScript BETA", TextColor3=Color3.fromRGB(230,230,230), Font=Enum.Font.SourceSansBold, TextSize=18, TextXAlignment=Enum.TextXAlignment.Left})
-make(titleBar,"TextLabel",{Size=UDim2.new(0,260,1,0), Position=UDim2.new(1,-260,0,0), BackgroundTransparency=1, Text="UniScript is loading... | By Ryan", TextColor3=Color3.fromRGB(160,160,160), Font=Enum.Font.SourceSans, TextSize=13, TextXAlignment=Enum.TextXAlignment.Right})
+make(titleBar,"TextLabel",{Size=UDim2.new(1,-120,1,0), Position=UDim2.new(0,20,0,0), BackgroundTransparency=1, Text="UniScript BETA", TextColor3=Color3.fromRGB(230,230,230), Font=Enum.Font.SourceSansBold, TextSize=18, TextXAlignment=Enum.TextXAlignment.Left})
+make(titleBar,"TextLabel",{Size=UDim2.new(0,260,1,0), Position=UDim2.new(1,-260,0,0), BackgroundTransparency=1, Text="By Ryan", TextColor3=Color3.fromRGB(160,160,160), Font=Enum.Font.SourceSans, TextSize=13, TextXAlignment=Enum.TextXAlignment.Right})
 
+-- Sidebar
 local sidebar = make(window,"Frame",{Size=UDim2.new(0,170,1,-44), Position=UDim2.new(0,0,0,44), BackgroundColor3=Color3.fromRGB(24,24,28), BorderSizePixel=0})
 make(sidebar,"UICorner",{CornerRadius=UDim.new(0,6)})
 make(sidebar,"UIListLayout",{Padding=UDim.new(0,8), SortOrder=Enum.SortOrder.LayoutOrder})
 
+-- Content Pages
 local content = make(window,"Frame",{Size=UDim2.new(1,-180,1,-54), Position=UDim2.new(0,180,0,50), BackgroundTransparency=1})
 local pages = {}
 local function makePage()
@@ -78,6 +88,7 @@ local combatPage = makePage(); combatPage.Visible=true
 local miscPage = makePage()
 local extrasPage = makePage()
 
+-- Tab Buttons
 local function makeTabButton(text,page)
     local btn = make(sidebar,"TextButton",{Size=UDim2.new(1,-16,0,44), BackgroundColor3=Color3.fromRGB(28,28,32), BorderSizePixel=0, Text=text, TextColor3=Color3.fromRGB(220,220,220), Font=Enum.Font.SourceSansBold, TextSize=15})
     make(btn,"UICorner",{CornerRadius=UDim.new(0,6)})
@@ -93,6 +104,7 @@ makeTabButton("Combat",combatPage).BackgroundColor3=Color3.fromRGB(40,40,46)
 makeTabButton("Misc",miscPage)
 makeTabButton("Extras",extrasPage)
 
+-- UI Helpers
 local function addToggle(parent,text,callback)
     local btn = make(parent,"TextButton",{Size=UDim2.new(1,-10,0,32), BackgroundColor3=Color3.fromRGB(32,32,36), Text=text.." [OFF]", TextColor3=Color3.fromRGB(220,220,220), Font=Enum.Font.SourceSans, TextSize=15})
     make(btn,"UICorner",{CornerRadius=UDim.new(0,6)})
@@ -124,12 +136,10 @@ local function addSlider(parent,text,min,max,default,callback)
     UIS.InputEnded:Connect(function(i) if dragging and i.UserInputType==Enum.UserInputType.MouseButton1 then dragging=false end end)
 end
 
--- =========================
 -- Populate UI
--- =========================
 addToggle(combatPage,"Aimlock",function(v) Settings.AimlockEnabled=v end)
-addToggle(combatPage,"Show Aimlock FOV",function(v) showFOV=v if AimlockCircle then AimlockCircle.Visible=v and Settings.AimlockEnabled end end)
-addSlider(combatPage,"Aimlock FOV",50,500,Settings.AimlockFOV,function(v) Settings.AimlockFOV=v if AimlockCircle then AimlockCircle.Radius=v end end)
+addToggle(combatPage,"Show Aimlock FOV",function(v) showFOV=v if AimlockCircle then AimlockCircle.Visible = Settings.AimlockEnabled and showFOV end end)
+addSlider(combatPage,"Aimlock FOV",50,500,Settings.AimlockFOV,function(v) Settings.AimlockFOV=v end)
 addSlider(combatPage,"Prediction",0,100,Settings.AimlockPrediction*100,function(v) Settings.AimlockPrediction=v/100 end)
 addToggle(combatPage,"Wallbang",function(v) Settings.WallbangEnabled=v end)
 addToggle(combatPage,"Melee Aura",function(v) Settings.MeleeAuraEnabled=v end)
@@ -140,6 +150,7 @@ addToggle(miscPage,"Infinite Sprint",function(v) Settings.InfiniteSprint=v end)
 addSlider(miscPage,"Player FOV",70,120,Settings.PlayerFOV,function(v) Settings.PlayerFOV=v Camera.FieldOfView=v end)
 addToggle(miscPage,"ESP",function(v) Settings.ESPEnabled=v end)
 
+-- Extras buttons
 local copyBtn = make(extrasPage,"TextButton",{Size=UDim2.new(0,240,0,34), BackgroundColor3=Color3.fromRGB(60,60,70), Text="Copy Discord", TextColor3=Color3.fromRGB(230,230,230)})
 make(copyBtn,"UICorner",{CornerRadius=UDim.new(0,6)})
 copyBtn.MouseButton1Click:Connect(function() pcall(function() setclipboard("https://discord.gg/dJEM47ZtGa") end) end)
@@ -148,9 +159,7 @@ local unloadBtn = make(extrasPage,"TextButton",{Size=UDim2.new(0,240,0,34), Back
 make(unloadBtn,"UICorner",{CornerRadius=UDim.new(0,6)})
 unloadBtn.MouseButton1Click:Connect(function() screenGui:Destroy() end)
 
--- =========================
 -- Draggable Window
--- =========================
 do
     local dragging, dragStart, startPos
     titleBar.InputBegan:Connect(function(i)
@@ -196,6 +205,54 @@ task.spawn(function()
     end
 end)
 
+-- Player FOV updater & Aimlock
+UIS.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        aiming = true
+    end
+end)
+UIS.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton2 then
+        aiming = false
+    end
+end)
+
+local function getClosestTarget()
+    local closest = nil
+    local dist = math.huge
+    for _, player in pairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+            local screenPos, onScreen = Camera:WorldToViewportPoint(player.Character.HumanoidRootPart.Position)
+            if onScreen then
+                local magnitude = (Vector2.new(screenPos.X,screenPos.Y) - Vector2.new(Camera.ViewportSize.X/2,Camera.ViewportSize.Y/2)).Magnitude
+                if magnitude < dist and magnitude <= Settings.AimlockFOV then
+                    closest = player
+                    dist = magnitude
+                end
+            end
+        end
+    end
+    return closest
+end
+
+RunService.RenderStepped:Connect(function()
+    if Camera then Camera.FieldOfView = Settings.PlayerFOV end
+    if DrawingAvailable and AimlockCircle then
+        AimlockCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+        AimlockCircle.Radius = Settings.AimlockFOV
+        AimlockCircle.Visible = Settings.AimlockEnabled and showFOV
+    end
+
+    if aiming and Settings.AimlockEnabled then
+        local target = getClosestTarget()
+        if target and target.Character and target.Character:FindFirstChild("Head") then
+            local headPos = target.Character.Head.Position
+            local predictedPos = headPos + (target.Character.HumanoidRootPart.Velocity * Settings.AimlockPrediction)
+            Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, predictedPos)
+        end
+    end
+end)
+
 -- NoClip
 RunService.Stepped:Connect(function()
     if Settings.NoClipEnabled and Character then
@@ -205,33 +262,42 @@ RunService.Stepped:Connect(function()
     end
 end)
 
--- =========================
 -- ESP (Boxes + Names + Distance)
--- =========================
-local ESPBoxes, ESPNames, ESPDistances = {}, {}, {}
+local ESPBoxes = {}
+local ESPNames = {}
+local ESPDistances = {}
+
 local function createESP(player)
-    if player==LocalPlayer then return end
+    if player == LocalPlayer then return end
+
     local box = Drawing.new("Square")
     box.Color = Color3.fromRGB(0,255,0)
     box.Thickness = 2
     box.Filled = false
-    local nameTag = Drawing.new("Text")
-    nameTag.Color = Color3.fromRGB(255,255,255)
-    nameTag.Center = true
-    nameTag.Size = 14
-    local distanceTag = Drawing.new("Text")
-    distanceTag.Color = Color3.fromRGB(255,255,0)
-    distanceTag.Center = true
-    distanceTag.Size = 14
-    ESPBoxes[player]=box
-    ESPNames[player]=nameTag
-    ESPDistances[player]=distanceTag
+    box.Transparency = 1
+    ESPBoxes[player] = box
+
+    local nameText = Drawing.new("Text")
+    nameText.Color = Color3.fromRGB(255,255,255)
+    nameText.Size = 14
+    nameText.Center = true
+    nameText.Outline = true
+    ESPNames[player] = nameText
+
+    local distText = Drawing.new("Text")
+    distText.Color = Color3.fromRGB(255,255,255)
+    distText.Size = 14
+    distText.Center = true
+    distText.Outline = true
+    ESPDistances[player] = distText
 end
+
 local function removeESP(player)
     if ESPBoxes[player] then ESPBoxes[player]:Remove() ESPBoxes[player]=nil end
     if ESPNames[player] then ESPNames[player]:Remove() ESPNames[player]=nil end
     if ESPDistances[player] then ESPDistances[player]:Remove() ESPDistances[player]=nil end
 end
+
 Players.PlayerAdded:Connect(createESP)
 Players.PlayerRemoving:Connect(removeESP)
 for _,p in pairs(Players:GetPlayers()) do createESP(p) end
@@ -241,84 +307,39 @@ RunService.RenderStepped:Connect(function()
         if Settings.ESPEnabled and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
             local root = player.Character.HumanoidRootPart
             local head = player.Character:FindFirstChild("Head")
-            if head then
-                local pos, onScreen = Camera:WorldToViewportPoint(root.Position)
-                if onScreen then
-                    local screenPosHead, _ = Camera:WorldToViewportPoint(head.Position)
-                    box.Visible = true
-                    box.Size = Vector2.new(30, 60)
-                    box.Position = Vector2.new(pos.X-15, pos.Y-30)
-                    ESPNames[player].Visible = true
-                    ESPNames[player].Position = Vector2.new(screenPosHead.X, screenPosHead.Y - 25)
-                    ESPNames[player].Text = player.Name
-                    ESPDistances[player].Visible = true
-                    ESPDistances[player].Position = Vector2.new(screenPosHead.X, screenPosHead.Y - 10)
-                    ESPDistances[player].Text = tostring(math.floor((root.Position - RootPart.Position).Magnitude)).."m"
-                else
-                    box.Visible = false
-                    ESPNames[player].Visible = false
-                    ESPDistances[player].Visible = false
+            local pos, vis = Camera:WorldToViewportPoint(root.Position)
+            if vis then
+                box.Visible = true
+                box.Size = Vector2.new(30, 60)
+                box.Position = Vector2.new(pos.X-15, pos.Y-30)
+
+                if head then
+                    local headPos, headVis = Camera:WorldToViewportPoint(head.Position + Vector3.new(0,0.5,0))
+                    if headVis then
+                        ESPNames[player].Visible = true
+                        ESPNames[player].Position = Vector2.new(headPos.X, headPos.Y-10)
+                        ESPNames[player].Text = player.Name
+                        ESPDistances[player].Visible = true
+                        local distance = math.floor((root.Position - workspace.CurrentCamera.CFrame.Position).Magnitude)
+                        ESPDistances[player].Position = Vector2.new(headPos.X, headPos.Y+10)
+                        ESPDistances[player].Text = distance.." studs"
+                    else
+                        ESPNames[player].Visible = false
+                        ESPDistances[player].Visible = false
+                    end
                 end
+            else
+                box.Visible = false
+                ESPNames[player].Visible = false
+                ESPDistances[player].Visible = false
             end
         else
             box.Visible = false
-            if ESPNames[player] then ESPNames[player].Visible=false end
-            if ESPDistances[player] then ESPDistances[player].Visible=false end
+            ESPNames[player].Visible = false
+            ESPDistances[player].Visible = false
         end
     end
 end)
 
 -- =========================
--- Aimlock / Aimbot (Head Only, Right Click)
--- =========================
-local aiming = false
-local showFOV = true
-
-UIS.InputBegan:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then aiming = true end
-end)
-UIS.InputEnded:Connect(function(input)
-    if input.UserInputType == Enum.UserInputType.MouseButton2 then aiming = false end
-end)
-
-local function getClosestTarget()
-    local closest, shortestDist = nil, math.huge
-    if not aiming or not Settings.AimlockEnabled then return nil end
-    for _, player in pairs(Players:GetPlayers()) do
-        if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Head") then
-            local headPos = player.Character.Head.Position
-            local screenPos, onScreen = Camera:WorldToViewportPoint(headPos)
-            if onScreen then
-                local center = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-                local dist = (Vector2.new(screenPos.X, screenPos.Y)-center).Magnitude
-                if dist < Settings.AimlockFOV and dist < shortestDist then
-                    shortestDist = dist
-                    closest = player
-                end
-            end
-        end
-    end
-    return closest
-end
-
-RunService.RenderStepped:Connect(function()
-    if Camera then
-        if DrawingAvailable and AimlockCircle then
-            AimlockCircle.Position = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-            AimlockCircle.Radius = Settings.AimlockFOV
-            AimlockCircle.Visible = showFOV and Settings.AimlockEnabled
-        end
-
-        if aiming and Settings.AimlockEnabled then
-            local target = getClosestTarget()
-            if target and target.Character and target.Character:FindFirstChild("Head") then
-                local headPos = target.Character.Head.Position
-                local predictedPos = headPos + (target.Character.HumanoidRootPart.Velocity * Settings.AimlockPrediction)
-                Camera.CFrame = CFrame.lookAt(Camera.CFrame.Position, predictedPos)
-            end
-        end
-    end
-end)
-
--- =========================
-print("✅ UniScript BETA: Fully Merged & Features Loaded Safely")
+print("✅ UniScript BETA: UI + Features Loaded Safely")
